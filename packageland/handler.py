@@ -3,7 +3,7 @@ import os
 from multiprocessing import Pool
 
 from tqdm import tqdm
-from tqdm.contrib.concurrent import process_map
+# from tqdm.contrib.concurrent import process_map
 
 
 def chunks(arr, size):
