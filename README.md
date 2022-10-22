@@ -8,25 +8,31 @@ Scripts for specialized image processing. Mostly related to ffxiv.
 
 ## icadm.py
 
-icadm = image channel and directory manipulator
+ICADM, Image Channel and Directory Modifier
 
 Handles two major issues in my workflow, and some other nitpicking.
 
 1. Seperates RGBA images into (RGB, A) or (R, G, B, A).
 2. Flattens nested directory structures.
+```
+usage: icadm.py [-h] --directory -D --command -C [--output -O]
 
-command-line: python icadm.py $command $folder
+options:
 
-$command can be flatten, unflatten, split, merge, 4split, 4merge, tga_png
+-h, --help      show this help message and exit
+--directory     Initial directory to be processed.
+--command       split, merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!)
+--output        output image type, png=default or tga.
+```
+command descriptions:
 
 flatten, unflatten - flattens/unflattens directory structure.
-split, merge -  flattens/unflattens directory structure and splits/merges RGBA - (RGB, A) images.
-4split, 4merge - same as (split, merge) but with (R, G, B, A) instead of (RGB, A).
-tga_png - converts all images in directory to png.
 
-e.g.: given folder/dog/cat/image.png, running python icadm.py folder split, returns 
-folder_rgb/folderdogcatimage.png (RGB image)
-folder_alpha/folderdogcatimage.png (Alpha image)
+split, merge -  flattens/unflattens directory structure and splits/merges RGBA - (RGB, A) images.
+
+4split, 4merge - same as (split, merge) but with (R, G, B, A) instead of (RGB, A).
+
+tga_png - converts all images in directory to png. (DESTRUCTIVE)
 
 
 ## unique_color_threshold
