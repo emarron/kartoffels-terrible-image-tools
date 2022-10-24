@@ -1,15 +1,16 @@
 import argparse
-import sys
 from pathlib import Path
 
 from PIL import Image, ImageChops
 
 from packageland import handler
+Image.MAX_IMAGE_PIXELS = None
 
 parser = argparse.ArgumentParser(description="ICADM, Image Channel and Directory Modifier")
 parser.add_argument('--directory', metavar='-D', type=str, help='Initial directory to be processed.', required=True)
 parser.add_argument('--command', metavar='-C', type=str,
-                    help='split, merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!)', required=True)
+                    help='split, merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!)',
+                    required=True)
 parser.add_argument('--output', metavar='-O', type=str, help='output image type, png=default or tga.')
 args = parser.parse_args()
 

@@ -3,7 +3,9 @@
 
 Scripts for specialized image processing. Mostly related to ffxiv.
 
+## REQUIREMENTS
 
+just run ```pip install -r requirements.txt```
 
 
 ## icadm.py
