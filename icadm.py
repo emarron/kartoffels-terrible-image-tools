@@ -84,8 +84,8 @@ def do_thing_split_R_G_B_A(path):
     """
     with Image.open(path) as image:
         # todo: first part to function.
-        red_folder, green_folder, blue_folder, alpha_folder = [Path(str(folder) + 'R'), Path(str(folder) + 'G'),
-                                                               Path(str(folder) + 'B'), Path(str(folder) + 'A')]
+        red_folder, green_folder, blue_folder, alpha_folder = [Path(str(folder) + '_R'), Path(str(folder) + '_G'),
+                                                               Path(str(folder) + '_B'), Path(str(folder) + '_A')]
         red_path, green_path, blue_path, alpha_path = [Path.joinpath(red_folder, flatten_path(path)),
                                                        Path.joinpath(green_folder, flatten_path(path)),
                                                        Path.joinpath(blue_folder, flatten_path(path)),
@@ -112,8 +112,8 @@ def do_thing_TGA_PNG(path):
 
 
 def do_thing_merge_R_G_B_A(path):
-    red_folder, green_folder, blue_folder, alpha_folder = [Path(str(folder) + 'R'), Path(str(folder) + 'G'),
-                                                           Path(str(folder) + 'B'), Path(str(folder) + 'A')]
+    red_folder, green_folder, blue_folder, alpha_folder = [Path(str(folder) + '_R'), Path(str(folder) + '_G'),
+                                                           Path(str(folder) + '_B'), Path(str(folder) + '_A')]
     red_path, green_path, blue_path, alpha_path = [Path.joinpath(red_folder, flatten_path(path)),
                                                    Path.joinpath(green_folder, flatten_path(path)),
                                                    Path.joinpath(blue_folder, flatten_path(path)),
