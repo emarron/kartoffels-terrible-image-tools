@@ -49,4 +49,4 @@ if __name__ == '__main__':
     if parallel:
         handler.parallel_process(input_list, do_the_thing, 1)
     else:
-        handler.solo_process(input_list, do_the_thing, 1)
+        handler.solo_process(input_list, do_the_thing)
