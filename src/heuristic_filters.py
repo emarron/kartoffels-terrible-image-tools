@@ -2,11 +2,10 @@ import argparse
 import shutil
 from pathlib import Path
 
-import numpy
+from numpy import asarray, linalg
 
 from packageland import handler
 from PIL import Image, ImageStat
-from sklearn import preprocessing
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -45,7 +44,7 @@ def get_variance_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
-        normalized_variance = preprocessing.normalize([variance])[0]
+        normalized_variance = variance/linalg.norm(variance)
         variance_range = (max(normalized_variance) - min(normalized_variance))
         result = is_range_greater_than_threshold(variance_range)
     return result
@@ -55,7 +54,7 @@ def get_mean_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean = ImageStat.Stat(histogram).mean
-        normalized_mean = preprocessing.normalize([mean])[0]
+        normalized_mean = mean/linalg.norm(mean)
         mean_range = (max(normalized_mean) - min(normalized_mean))
         result = is_range_greater_than_threshold(mean_range)
     return result
@@ -69,7 +68,7 @@ def is_range_greater_than_threshold(range):
 def is_stddev_greater_than_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
-        mean, stddev = numpy.asarray(ImageStat.Stat(histogram).mean), numpy.asarray(ImageStat.Stat(histogram).stddev)
+        mean, stddev = asarray(ImageStat.Stat(histogram).mean), asarray(ImageStat.Stat(histogram).stddev)
         result = (stddev * threshold > mean)
         return result
 
