@@ -16,7 +16,7 @@ def get_unique_colors(path):
 
 def unique_color_threshold(path):
     # value = 2e6 for jank, 200-ish for not ffxiv color-maps
-    value = 1000
+    value = 255
     if get_unique_colors(path) > value:
         shutil.copy(path, ("./threshold_matched/" + path.name))
 
@@ -24,10 +24,10 @@ def unique_color_threshold(path):
 if __name__ == '__main__':
     output_path = Path('./threshold_matched')
     output_path.mkdir(exist_ok=True, parents=True)
-    inputs_path = Path('./channel_variance')
+    inputs_path = Path('./normals_A')
     input_list = list(inputs_path.glob('**/*.*'))
     parallel = True
     if parallel:
-        handler.parallel_process(input_list, unique_color_threshold, 10)
+        handler.parallel_process(input_list, unique_color_threshold, 5)
     else:
         handler.solo_process(input_list, unique_color_threshold)

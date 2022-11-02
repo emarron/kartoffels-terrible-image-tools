@@ -22,8 +22,6 @@ parser.add_argument('--threshold', '-t', metavar='-T', type=float, default=0.5,
 parser.add_argument('--multiplier', '-m', metavar='-M', type=int, default=5,
                     help='if using multicore processing, job multiplier per core. default = 5')
 args = parser.parse_args()
-
-
 """some operations to hopefully find interesting images when they are not labeled properly. 
 mean_range: A large difference between the means of each channel can indicate that the channels are being used for 
 different purposes. threshold should be around 0.1-1.0
@@ -31,6 +29,8 @@ var_range: A large difference between the variances of each channel can indicate
 different purposes. threshold should be from 0.1-1.0
 stdev_greater_than_mean: If the stddev of any channel is greater than the mean of that channel, then the image may have 
 channel(s) being used for opacity. mean scalar should be from 1-5
+
+basically some cost-effective F-tests
 """
 
 
@@ -44,7 +44,7 @@ def get_variance_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
-        normalized_variance = variance/linalg.norm(variance)
+        normalized_variance = variance / linalg.norm(variance)
         variance_range = (max(normalized_variance) - min(normalized_variance))
         result = is_range_greater_than_threshold(variance_range)
     return result
@@ -54,7 +54,7 @@ def get_mean_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean = ImageStat.Stat(histogram).mean
-        normalized_mean = mean/linalg.norm(mean)
+        normalized_mean = mean / linalg.norm(mean)
         mean_range = (max(normalized_mean) - min(normalized_mean))
         result = is_range_greater_than_threshold(mean_range)
     return result
@@ -69,8 +69,27 @@ def is_stddev_greater_than_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean, stddev = asarray(ImageStat.Stat(histogram).mean), asarray(ImageStat.Stat(histogram).stddev)
-        result = (stddev * threshold > mean)
+        result = (stddev > threshold * mean)
+        # is equiv to stddev/mean > threshold, but faster
         return result
+
+
+def is_med_greater_than_mean(image_path):
+    with Image.open(image_path) as image:
+        histogram = image.histogram()
+        mean, median = asarray(ImageStat.Stat(histogram).mean), asarray(ImageStat.Stat(histogram).median)
+        result = (median > threshold * mean)
+        return result
+
+
+def do_f_test(image_path):
+    with Image.open(image_path) as image:
+        histogram = image.histogram()
+        variance = ImageStat.Stat(histogram).var
+        normalized_variance = variance / linalg.norm(variance)
+        f_value = (max(normalized_variance) / min(normalized_variance))
+        result = is_range_greater_than_threshold(f_value)
+    return result
 
 
 def read_command(command):
@@ -80,6 +99,17 @@ def read_command(command):
         return get_mean_range, "_mean_range_"
     if "stddev_mean" == command.lower():
         return is_stddev_greater_than_mean, "_sttdev_mean_"
+    if "f_test" == command.lower():
+        return do_f_test, "_f_test_"
+    if "median_mean" == command.lower():
+        return is_med_greater_than_mean, "_med_mean_"
+
+
+p = Path(args.directory)
+parallel = args.parallel
+multiplier = args.multiplier
+threshold = args.threshold
+command = read_command(args.command)
 
 
 def image_handler(image_path):
@@ -97,11 +127,7 @@ def image_handler(image_path):
 
 
 if __name__ == '__main__':
-    p = Path(args.directory)
-    parallel = args.parallel
-    multiplier = args.multiplier
-    threshold = args.threshold
-    command = read_command(args.command)
+
     grabber = list(p.glob('**/*.*'))
     function = image_handler
     if parallel:

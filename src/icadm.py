@@ -1,4 +1,7 @@
 import argparse
+import shutil
+
+import numpy
 from pathlib import Path
 
 from PIL import Image, ImageChops
@@ -11,10 +14,11 @@ parser = argparse.ArgumentParser(description="ICADM, Image Channel and Directory
 parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial directory to be processed.',
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
-                    help='split, merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!), solid_colors',
+                    help='split, merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!), '
+                         'solid_colors, rgb_gray_fix, gray_rgb',
                     required=True)
-parser.add_argument('--output', '-o', metavar='-O', type=str, default='png', help='output image type, png or tga, '
-                                                                                  'default=png')
+# parser.add_argument('--output', '-o', metavar='-O', type=str, default='png', help='output image type, png or tga, '
+#                                                                                   'default=png')
 parser.add_argument('--parallel', '-p', metavar='-P', action=argparse.BooleanOptionalAction,
                     help='multicore processing')
 parser.add_argument('--multiplier', '-m', metavar='-M', type=int, default=5,
@@ -29,21 +33,25 @@ p = Path(folder)
 command = args.command
 parallel = args.parallel
 multiplier = args.multiplier
-output_suffix = args.output.lower()
+
+
+# output_suffix = args.output.lower()
 
 
 def save(image, path, suffix=None):
     path.parent.mkdir(exist_ok=True, parents=True)
     if suffix is not None:
         image.save(path.with_suffix(suffix))
-    elif output_suffix is not None and output_suffix == 'tga':
-        # make this not stupid later
-        image.save(path.with_suffix('.tga'))
+    # elif output_suffix is not None and output_suffix == 'tga':
+    #     # make this not stupid later
+    #     image.save(path.with_suffix('.tga'))
     else:
         image.save(path.with_suffix('.png'), compress_level=1)
 
 
-def make_path(path, d_suffix, flat=True):
+def make_path(path, d_suffix, flat=True, f_suffix=None):
+    if f_suffix:
+        path = path.with_suffix(f_suffix)
     out_folder = Path(str(folder) + d_suffix)
     if flat:
         out_path = Path.joinpath(out_folder, flatten_path(path))
@@ -69,6 +77,40 @@ def check_path_exists(path):
         if path.with_suffix('.tga').exists():
             path = path.with_suffix('.tga')
     return path
+
+
+def do_thing_rgb_gray_fix(path):
+    """
+    only to fix RGB[A] to Gray:Y←0.299⋅R+0.587⋅G+0.114⋅B from openCV
+    """
+    with Image.open(path) as image:
+        red_multiplier, green_multiplier, blue_multiplier = 1.1148, 0.56786, 2.9240
+        red_channel, green_channel, blue_channel = scale_image_values(image.getchannel('R'),
+                                                                      red_multiplier), scale_image_values(
+            image.getchannel('G'), green_multiplier), scale_image_values(image.getchannel('B'), blue_multiplier)
+        out_path = make_path(path, '_fixed_RGB', False)
+        save(Image.merge('RGB', (red_channel.getchannel(0), green_channel.getchannel(0), blue_channel.getchannel(0))),
+             out_path)
+
+
+def do_thing_rgb_gray(path):
+    with Image.open(path) as image:
+        out_path = make_path(path, '_gray', False)
+        if numpy.array_equal(numpy.array(image.getchannel('R')), numpy.array(image.getchannel('G'))):
+            save(image.getchannel('R'), out_path)
+        else:
+            raise ValueError
+
+
+def scale_image_values(image, multiplier):
+    out_array = numpy.array(image) * multiplier
+    return Image.fromarray(numpy.rint(out_array).astype(numpy.uint8))
+
+
+def do_thing_gray_rgb(path):
+    with Image.open(path) as image:
+        out_path = make_path(path, '_gray')
+        save(Image.merge('RGB', (image.split()[0], image.split()[0], image.split()[0])), out_path)
 
 
 def do_thing_flatten(path):
@@ -157,10 +199,11 @@ def do_thing_TGA_PNG(path):
 
 
 def do_thing_merge_R_G_B_A(path):
-    red_path, green_path, blue_path, alpha_path = [make_path(path, '_R'),
-                                                   make_path(path, '_G'),
-                                                   make_path(path, '_B'),
-                                                   make_path(path, '_A')]
+    red_path, green_path, blue_path, alpha_path = (
+        make_path(path, '_R'), make_path(path, '_G'), make_path(path, '_B'), make_path(path, '_A'))
+    red_path, green_path, blue_path, alpha_path = (
+        check_path_exists(red_path), check_path_exists(green_path), check_path_exists(blue_path),
+        check_path_exists(alpha_path))
     try:
         with Image.merge('RGB', [Image.open(red_path).convert('L'), Image.open(green_path).convert('L'),
                                  Image.open(blue_path).convert('L')]) as image:
@@ -168,10 +211,9 @@ def do_thing_merge_R_G_B_A(path):
             try:
                 with Image.open(alpha_path).convert('L') as alpha:
                     image.putalpha(alpha)
-                    save(image, merged_path)
+                    save(image, merged_path, ".tga")
             except FileNotFoundError:
-                # could just copy rather than open and save
-                save(image, merged_path)
+                save(image, merged_path, ".png")
     except FileNotFoundError:
         pass
 
@@ -182,15 +224,19 @@ def do_thing_merge_RGB_A(path):
     alpha_path = make_path(path, '_A')
     alpha_path = check_path_exists(alpha_path)
     try:
-        with Image.open(rgb_path) as image:
-            merged_path = make_path(path, '_output', False)
-            try:
-                with Image.open(alpha_path).convert('L') as alpha:
-                    image.putalpha(alpha)
-                    save(image, merged_path)
-            except FileNotFoundError:
-                # could just copy rather than open and save
-                save(image, merged_path)
+        image = Image.open(rgb_path)
+        merged_path = make_path(path, '_output', False)
+        try:
+            with Image.open(alpha_path).convert('L') as alpha:
+                image.putalpha(alpha)
+                save(image, merged_path, ".tga")
+                image.close()
+        except FileNotFoundError:
+            # save(image, merged_path)
+            image.close()
+            merged_path.parent.mkdir(exist_ok=True, parents=True)
+            shutil.copy(rgb_path, merged_path.with_suffix(".png"))
+            pass
     except FileNotFoundError:
         pass
 
@@ -212,6 +258,10 @@ def read_command(command):
         return do_thing_unflatten
     if "solid_colors" == command.lower():
         return do_thing_get_solid_colors
+    if "rgb_gray_fix" == command.lower():
+        return do_thing_rgb_gray_fix
+    if "rgb_gray" == command.lower():
+        return do_thing_rgb_gray
 
 
 if __name__ == '__main__':
