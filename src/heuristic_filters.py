@@ -1,8 +1,7 @@
 import argparse
 import shutil
 from pathlib import Path
-
-from numpy import asarray, linalg
+import numpy as np
 
 from packageland import handler
 from PIL import Image, ImageStat
@@ -19,7 +18,7 @@ parser.add_argument('--parallel', '-p', metavar='-P', action=argparse.BooleanOpt
                     help='multicore processing')
 parser.add_argument('--threshold', '-t', metavar='-T', type=float, default=0.5,
                     help='threshold for mean and var range, scalar for stddev, default=0.5')
-parser.add_argument('--multiplier', '-m', metavar='-M', type=int, default=5,
+parser.add_argument('--multiplier', '-m', metavar='-M', type=float, default=5,
                     help='if using multicore processing, job multiplier per core. default = 5')
 args = parser.parse_args()
 """some operations to hopefully find interesting images when they are not labeled properly. 
@@ -44,7 +43,7 @@ def get_variance_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
-        normalized_variance = variance / linalg.norm(variance)
+        normalized_variance = variance / np.linalg.norm(variance)
         variance_range = (max(normalized_variance) - min(normalized_variance))
         result = is_range_greater_than_threshold(variance_range)
     return result
@@ -54,7 +53,7 @@ def get_mean_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean = ImageStat.Stat(histogram).mean
-        normalized_mean = mean / linalg.norm(mean)
+        normalized_mean = mean / np.linalg.norm(mean)
         mean_range = (max(normalized_mean) - min(normalized_mean))
         result = is_range_greater_than_threshold(mean_range)
     return result
@@ -68,7 +67,7 @@ def is_range_greater_than_threshold(range):
 def is_stddev_greater_than_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
-        mean, stddev = asarray(ImageStat.Stat(histogram).mean), asarray(ImageStat.Stat(histogram).stddev)
+        mean, stddev = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).stddev)
         result = (stddev > threshold * mean)
         # is equiv to stddev/mean > threshold, but faster
         return result
@@ -77,7 +76,7 @@ def is_stddev_greater_than_mean(image_path):
 def is_med_greater_than_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
-        mean, median = asarray(ImageStat.Stat(histogram).mean), asarray(ImageStat.Stat(histogram).median)
+        mean, median = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).median)
         result = (median > threshold * mean)
         return result
 
@@ -86,9 +85,23 @@ def do_f_test(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
-        normalized_variance = variance / linalg.norm(variance)
+        normalized_variance = variance / np.linalg.norm(variance)
         f_value = (max(normalized_variance) / min(normalized_variance))
         result = is_range_greater_than_threshold(f_value)
+    return result
+
+
+def get_unique_colors(image_path):
+    # https://stackoverflow.com/questions/59669715/fastest-way-to-find-the-rgb-pixel-color-count-of-image/59671950#59671950
+    with Image.open(image_path).convert('RGB') as img:
+        na = np.array(img)
+    try:
+        f = np.dot(na.astype(np.uint32), [1, 256, 65536])
+        colors = len(np.unique(f))
+    except np.core._exceptions._ArrayMemoryError:
+        colors = np.unique(na.reshape(-1, na.shape[2]), axis=0)
+        # waaaaaaaaaaaaaaaaaaaaaay slower
+    result = colors > threshold
     return result
 
 
@@ -103,6 +116,8 @@ def read_command(command):
         return do_f_test, "_f_test_"
     if "median_mean" == command.lower():
         return is_med_greater_than_mean, "_med_mean_"
+    if "unique_colors" == command.lower():
+        return get_unique_colors, "_unique_colors_"
 
 
 p = Path(args.directory)
@@ -131,7 +146,7 @@ if __name__ == '__main__':
     grabber = list(p.glob('**/*.*'))
     function = image_handler
     if parallel:
-        handler.parallel_process(grabber, function, 5)
+        handler.parallel_process(grabber, function, multiplier)
 
     else:
         handler.solo_process(grabber, function)
