@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(description="Heuristic Filters, Filter images b
 parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial directory to be processed.',
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
-                    help='variance_range, mean_range, stddev_mean',
+                    help='variance_range, mean_range, stddev_mean, median_mean, unique_colors',
                     required=True)
 parser.add_argument('--parallel', '-p', metavar='-P', action=argparse.BooleanOptionalAction,
                     help='multicore processing')
@@ -21,16 +21,6 @@ parser.add_argument('--threshold', '-t', metavar='-T', type=float, default=0.5,
 parser.add_argument('--multiplier', '-m', metavar='-M', type=float, default=5,
                     help='if using multicore processing, job multiplier per core. default = 5')
 args = parser.parse_args()
-"""some operations to hopefully find interesting images when they are not labeled properly. 
-mean_range: A large difference between the means of each channel can indicate that the channels are being used for 
-different purposes. threshold should be around 0.1-1.0
-var_range: A large difference between the variances of each channel can indicate the the channels are being used for
-different purposes. threshold should be from 0.1-1.0
-stdev_greater_than_mean: If the stddev of any channel is greater than the mean of that channel, then the image may have 
-channel(s) being used for opacity. mean scalar should be from 1-5
-
-basically some cost-effective F-tests
-"""
 
 
 def make_path(path, d_suffix):
@@ -40,6 +30,10 @@ def make_path(path, d_suffix):
 
 
 def get_variance_range(image_path):
+    """
+    sort of like an f test, if the range is between channels' variance is high it tells us that the image is likely a
+    composite/multi image.
+    """
     with Image.open(image_path) as image:
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
@@ -50,6 +44,9 @@ def get_variance_range(image_path):
 
 
 def get_mean_range(image_path):
+    """
+    same type of function as get_variance_range, just a slightly different flavor.
+    """
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean = ImageStat.Stat(histogram).mean
@@ -60,7 +57,31 @@ def get_mean_range(image_path):
 
 
 def is_range_greater_than_threshold(range):
+    """
+    :param range: float
+    :return: True or Flase
+    """
     if range >= threshold:
+        return True
+
+
+def is_var_greater_than_mean(var, mean):
+    """
+    checks if var or mean is greater, then sets the lower value as lesser and the higher value as greater.
+    we would then check if (lesser/greater > threshold), however (lesser > greater * threshold) is more efficient.
+    This function with stddev, median, mode can tell us if the mean isn't representative of the data.
+
+    :param var: variable
+    :param mean: the mean
+    :return: True or False
+    """
+    if var > mean:
+        greater = var
+        lesser = mean
+    else:
+        greater = var
+        lesser = mean
+    if lesser > threshold * greater:
         return True
 
 
@@ -68,20 +89,30 @@ def is_stddev_greater_than_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean, stddev = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).stddev)
-        result = (stddev > threshold * mean)
-        # is equiv to stddev/mean > threshold, but faster
+        result = is_var_greater_than_mean(stddev, mean)
         return result
 
 
-def is_med_greater_than_mean(image_path):
+def is_median_greater_than_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean, median = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).median)
-        result = (median > threshold * mean)
+        result = is_var_greater_than_mean(median, mean)
+        return result
+
+
+def is_mode_greater_than_mean(image_path):
+    with Image.open(image_path) as image:
+        histogram = image.histogram()
+        mean, mode = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).mode)
+        result = is_var_greater_than_mean(mode, mean)
         return result
 
 
 def do_f_test(image_path):
+    """
+    normally you would use this instead of ranges but division is expensive, and I'm already using python.
+    """
     with Image.open(image_path) as image:
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
@@ -92,6 +123,10 @@ def do_f_test(image_path):
 
 
 def get_unique_colors(image_path):
+    """
+    I just googled some fast ways to do this. method 1 is fast, but sometimes gets a memory error, so if that happens
+    we use method 2, which is like 4x slower.
+    """
     # https://stackoverflow.com/questions/59669715/fastest-way-to-find-the-rgb-pixel-color-count-of-image/59671950#59671950
     with Image.open(image_path).convert('RGB') as img:
         na = np.array(img)
@@ -115,7 +150,7 @@ def read_command(command):
     if "f_test" == command.lower():
         return do_f_test, "_f_test_"
     if "median_mean" == command.lower():
-        return is_med_greater_than_mean, "_med_mean_"
+        return is_median_greater_than_mean, "_median_mean_"
     if "unique_colors" == command.lower():
         return get_unique_colors, "_unique_colors_"
 
