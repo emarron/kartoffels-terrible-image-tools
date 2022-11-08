@@ -130,12 +130,14 @@ def get_unique_colors(image_path):
     # https://stackoverflow.com/questions/59669715/fastest-way-to-find-the-rgb-pixel-color-count-of-image/59671950#59671950
     with Image.open(image_path).convert('RGB') as img:
         na = np.array(img)
+        # size = np.average([img.width, img.height])
     try:
         f = np.dot(na.astype(np.uint32), [1, 256, 65536])
         colors = len(np.unique(f))
     except np.core._exceptions._ArrayMemoryError:
         colors = np.unique(na.reshape(-1, na.shape[2]), axis=0)
         # waaaaaaaaaaaaaaaaaaaaaay slower
+    # result = size < threshold * colors
     result = colors > threshold
     return result
 

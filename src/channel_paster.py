@@ -12,14 +12,15 @@ def merge_rgb_blue(rgb, blue):
 
 
 def do_thing_merge(rgb):
-    blue = Path("./normal_flat_blue_4x", rgb.name)
+    blue = Path("./chara_B_cleaned", rgb.name)
     out_image = merge_rgb_blue(rgb, blue)
-    out_path = Path.joinpath(Path("output/channel_paster/"), blue.stem + ".png")
+    out_path = Path.joinpath(Path("output/chara_RGB_cleaned/"), blue.stem + ".png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_image.save(out_path, compress_level=1)
 
 
 if __name__ == '__main__':
-    rgb_path = Path('./normal_flat_rgb_4x/')
+    rgb_path = Path('./chara_RG_cleaned/')
     rgb_list = list(rgb_path.glob('*.*'))
     parallel = True
     if parallel:
