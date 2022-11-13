@@ -7,6 +7,7 @@ from PIL import Image
 from packageland import handler
 
 Image.MAX_IMAGE_PIXELS = None
+unimplemented_list = []
 
 
 def to_bands(img: Image.Image):
@@ -70,23 +71,34 @@ def do_thing_paste(dir):
     gc.collect()
 
 
-# normals_path = Path('./input')
-# normals_list = list(normals_path.glob('**/*.*'))
+def do_thing_split(path):
+    try:
+        with Image.open(path) as image:
+            with image.split()[3] as alpha:
+                output_path = Path.joinpath(Path('./output'), path.stem)
+                output_path.mkdir(exist_ok=True, parents=True)
+                alpha.save(Path.joinpath(output_path, path.stem + ".png"))
+            bands = to_bands(image)
+            for i, band in enumerate(bands):
+                band.save(Path.joinpath(output_path, Path(str(i) + ".png")))
+            del bands
+    except NotImplementedError:
+        unimplemented_list.append(path.name)
+
+
 # for path in tqdm(normals_list, desc="Folders Processed"):
-#     image = Image.open(path)
-#     bands = to_bands(image)
-#     alpha = (image.split()[3])
-#     output_path = Path.joinpath(Path('./output'), path.stem)
-#     output_path.mkdir(exist_ok=True, parents=True)
-#     alpha.save(Path.joinpath(output_path, path.stem + ".png"))
-#     for i, band in enumerate(bands):
-#         band.save(Path.joinpath(output_path, Path(str(i) + ".png")))
+#
 
 if __name__ == '__main__':
     XBR_path = Path('./xbr_4x_blend/')
     XBR_directories = list(filter(lambda path: path.is_dir(), XBR_path.glob('*')))
+    normals_path = Path('./chara_Flattened/')
+    normals_list = list(normals_path.glob('**/*.*'))
     parallel = True
     if parallel:
-        handler.parallel_process(XBR_directories, do_thing_paste, 1)
+        handler.parallel_process(normals_list, do_thing_split, 1)
+        for item in unimplemented_list:
+            print(item)
+
     else:
-        handler.solo_process(XBR_directories, do_thing_paste)
+        handler.solo_process(normals_list, do_thing_split)

@@ -15,7 +15,7 @@ parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial d
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
                     help='split, merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!), '
-                         'solid_colors, rgb_gray_fix, gray_rgb',
+                         'solid_colors, rgb_gray_fix, gray_rgb, rgb_gray',
                     required=True)
 # parser.add_argument('--output', '-o', metavar='-O', type=str, default='png', help='output image type, png or tga, '
 #                                                                                   'default=png')
@@ -33,6 +33,7 @@ p = Path(folder)
 command = args.command
 parallel = args.parallel
 multiplier = args.multiplier
+unimplemented_type = []
 
 
 # output_suffix = args.output.lower()
@@ -95,7 +96,7 @@ def do_thing_rgb_gray_fix(path):
 
 def do_thing_rgb_gray(path):
     with Image.open(path) as image:
-        out_path = make_path(path, '_gray', False)
+        out_path = make_path(path, '_rgb2gray', False)
         if numpy.array_equal(numpy.array(image.getchannel('R')), numpy.array(image.getchannel('G'))):
             save(image.getchannel('R'), out_path)
         else:
@@ -109,25 +110,45 @@ def scale_image_values(image, multiplier):
 
 def do_thing_gray_rgb(path):
     with Image.open(path) as image:
-        out_path = make_path(path, '_gray')
+        out_path = make_path(path, '_gray2rgb')
         save(Image.merge('RGB', (image.split()[0], image.split()[0], image.split()[0])), out_path)
+
+def do_thing_flatten_rgba(path):
+    """
+    flatten dir and save to PNG
+    """
+    try:
+        with Image.open(path) as image:
+            out_path = make_path(path, '_RGBA')
+            save(image.convert('RGBA'), out_path)
+    except NotImplementedError:
+        unimplemented_type.append(path.name)
+
+
+def do_thing_unflatten_rgba(path):
+    flattened_path = make_path(path, '_RGBA')
+    try:
+        with Image.open(flattened_path) as image:
+            merged_path = make_path(path, '_output', False)
+            save(image, merged_path)
+    except FileNotFoundError:
+        pass
 
 
 def do_thing_flatten(path):
     """
-    flatten dir and save to PNG
+    flatten dir
     """
-    with Image.open(path) as image:
-        out_path = make_path(path, '_RGBA')
-        save(image.convert('RGBA'), out_path)
+    out_path = make_path(path, '_flattened')
+    out_path.parent.mkdir(exist_ok=True, parents=True)
+    shutil.copy(path, out_path)
 
 
 def do_thing_unflatten(path):
-    flattened_path = make_path(path, '_RGBA')
+    flattened_path = make_path(path, '_flattened')
     try:
-        with Image.open(flattened_path) as image:
-            merged_path = Path.joinpath(Path('./output'), Path(*path.parts[1:]))
-            save(image, merged_path)
+        out_path = make_path(path, '_unflattened', False)
+        shutil.copy(flattened_path, out_path)
     except FileNotFoundError:
         pass
 
@@ -136,37 +157,43 @@ def do_thing_split_RGB_A(path):
     """
     flatten dir, separate RGB and A, and save to PNG
     """
-    with Image.open(path) as image:
-        rgb_path = make_path(path, '_RGB')
-        alpha_path = make_path(path, '_A')
-        save(image.convert('RGB'), rgb_path)
-        try:
-            with image.getchannel('A') as alpha:
-                # check if pure white
-                if ImageChops.invert(alpha).getbbox():
-                    save(alpha, alpha_path)
-        except ValueError:
-            pass
+    try:
+        with Image.open(path) as image:
+            rgb_path = make_path(path, '_RGB')
+            alpha_path = make_path(path, '_A')
+            save(image.convert('RGB'), rgb_path)
+            try:
+                with image.getchannel('A') as alpha:
+                    # check if pure white
+                    if ImageChops.invert(alpha).getbbox():
+                        save(alpha, alpha_path)
+            except ValueError:
+                pass
+    except NotImplementedError:
+        unimplemented_type.append(path.name)
 
 
 def do_thing_split_R_G_B_A(path):
     """
     flatten dir, separate R, G, B, A, and save to PNG
     """
-    with Image.open(path) as image:
-        red_path, green_path, blue_path, alpha_path = [make_path(path, '_R'),
-                                                       make_path(path, '_G'),
-                                                       make_path(path, '_B'),
-                                                       make_path(path, '_A')]
-        save(image.getchannel('R'), red_path)
-        save(image.getchannel('G'), green_path)
-        save(image.getchannel('B'), blue_path)
-        try:
-            with image.getchannel('A') as alpha:
-                if ImageChops.invert(alpha).getbbox():
-                    save(alpha, alpha_path)
-        except ValueError:
-            pass
+    try:
+        with Image.open(path) as image:
+            red_path, green_path, blue_path, alpha_path = [make_path(path, '_R'),
+                                                           make_path(path, '_G'),
+                                                           make_path(path, '_B'),
+                                                           make_path(path, '_A')]
+            save(image.getchannel('R'), red_path)
+            save(image.getchannel('G'), green_path)
+            save(image.getchannel('B'), blue_path)
+            try:
+                with image.getchannel('A') as alpha:
+                    if ImageChops.invert(alpha).getbbox():
+                        save(alpha, alpha_path)
+            except ValueError:
+                pass
+    except NotImplementedError:
+        unimplemented_type.append(path.name)
 
 
 def do_thing_get_solid_colors(path):
@@ -262,6 +289,8 @@ def read_command(command):
         return do_thing_rgb_gray_fix
     if "rgb_gray" == command.lower():
         return do_thing_rgb_gray
+    if "gray_rgb" == command.lower():
+        return do_thing_gray_rgb
 
 
 if __name__ == '__main__':
@@ -271,3 +300,5 @@ if __name__ == '__main__':
         handler.parallel_process(grabber, function, multiplier)
     else:
         handler.solo_process(grabber, function)
+    for item in unimplemented_type:
+        print(item)

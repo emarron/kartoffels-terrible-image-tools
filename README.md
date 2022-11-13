@@ -20,7 +20,8 @@ options:
 
 -h, --help      show this help message and exit
 --directory     Initial directory to be processed.
---command       split, merge, 4split, 4merge, flatten, unflatten, solid_colors, tga_png (tga_png is destructive!)
+--command       split, merge, 4split, 4merge, flatten, unflatten, solid_colors, tga_png (tga_png is destructive!), rgb_gray_fix,
+                gray_rgb, rgb_gray
 --output        output image type, png=default or tga.
 ```
 
@@ -36,22 +37,31 @@ solid_colors - read directory gets images that are solid colors and moves them t
 
 tga_png - converts all images in directory to png. (DESTRUCTIVE)
 
+gray_rgb - converts from grayscale to rgb by filling each channel with the grayscale channel. This is method is useful for passing very sensitive grayscale images through
+tools that would convert the grayscale to RGB internally using their 'weighted' conversion. See opencv2 GRAY2RGB weighting.
+
+rgb_gray - converts from rgb to gray IF red channel = green channel. This is how I convert back to grayscale.
+If my work is done properly the red channel WILL equal (or close enough, see numpy array comparison options) the green channel.
+
+rgb_gray_fix - this can 'adjust' weighted opencv2 GRAY2RGB to match my gray_rgb command output.
+
 ## heuristic_filters
 
 Heuristic Filters, Filter images by histogram based heuristics
 
+```
 options:
   -h, --help            show this help message and exit
   --directory -D, -d -D
                         Initial directory to be processed.
-  --command -C, -c -C   variance_range, mean_range, stddev_mean
+  --command -C, -c -C   variance_range, mean_range, stddev_mean, median_mean, unique_colors, f_test, x_mean, mean_x
   --parallel, --no-parallel, -p
                         multicore processing
   --threshold -T, -t -T
                         threshold for mean and var range, scalar for stddev, default=0.5
   --multiplier -M, -m -M
                         if using multicore processing, job multiplier per core. default = 5
-
+```
 
 some operations to hopefully find interesting images when they are not labeled properly.
 
@@ -65,16 +75,12 @@ stddev_mean: If the stddev of any channel is greater than the mean of that chann
 channel(s) being used for opacity. stddev scalar should be from 0.1-10, where scalar=10 gives 10*stddev, and scalar=0.1
 gives stddev/10.
 
-## unique_color_threshold
+x_mean: Checks if the threshold greater than mean. Use this to find meaninglessly speckled images. I.e. x=254
 
-Reads a directory of images and if the image has greater than $value unique colors, outputs to threshold_matched
-directory.
+mean_x: Checks if the threshold is less than or equal to the mean. Also use this to find meaninglessly speckled images. I.e. x=254
 
-I use it to:
-
-1. seperate ffxiv dye maps from ffxiv opacity maps, value=200ish
-2. seperate broken af images, value=2e6 (2 million)
-3. seperate ffxiv meaninglessly speckled alphas, value=2
+unique_color_threshold: Checks if image has greater than threshold unique colors. I use it to: separate ffxiv dye maps from
+ffxiv opacity maps (value=200ish), and separate broken af images (value=2e6 (2 million))
 
 ## ffxiv_alpha_bands
 

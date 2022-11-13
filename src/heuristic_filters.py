@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(description="Heuristic Filters, Filter images b
 parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial directory to be processed.',
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
-                    help='variance_range, mean_range, stddev_mean, median_mean, unique_colors',
+                    help='variance_range, mean_range, stddev_mean, median_mean, unique_colors, f_test, x_mean, mean_x',
                     required=True)
 parser.add_argument('--parallel', '-p', metavar='-P', action=argparse.BooleanOptionalAction,
                     help='multicore processing')
@@ -109,6 +109,26 @@ def is_mode_greater_than_mean(image_path):
         return result
 
 
+def is_threshold_greater_than_mean(image_path):
+    with Image.open(image_path) as image:
+        histogram = image.histogram()
+        mean = np.asarray(ImageStat.Stat(histogram).mean)
+        if threshold > mean:
+            return True
+        else:
+            return False
+
+
+def is_mean_greater_than_threshold(image_path):
+    with Image.open(image_path) as image:
+        histogram = image.histogram()
+        mean = np.asarray(ImageStat.Stat(histogram).mean)
+        if threshold <= mean:
+            return True
+        else:
+            return False
+
+
 def do_f_test(image_path):
     """
     normally you would use this instead of ranges but division is expensive, and I'm already using python.
@@ -155,6 +175,10 @@ def read_command(command):
         return is_median_greater_than_mean, "_median_mean_"
     if "unique_colors" == command.lower():
         return get_unique_colors, "_unique_colors_"
+    if "x_mean" == command.lower():
+        return is_threshold_greater_than_mean, "_x_mean_"
+    if "mean_x" == command.lower():
+        return is_mean_greater_than_threshold, "_mean_x_"    
 
 
 p = Path(args.directory)
