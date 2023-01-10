@@ -7,20 +7,35 @@ from packageland import handler
 from PIL import Image, ImageStat
 
 Image.MAX_IMAGE_PIXELS = None
-
+# todo: make this less stupid with the operators and commands in general. subparsers I think?
 parser = argparse.ArgumentParser(description="Heuristic Filters, Filter images by histogram based heuristics")
 parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial directory to be processed.',
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
-                    help='variance_range, mean_range, stddev_mean, median_mean, unique_colors, f_test, x_mean, mean_x',
+                    help='variance_range, mean_range, stddev_mean. threshold_mean, median_mean, unique_colors, f_test',
                     required=True)
 parser.add_argument('--parallel', '-p', metavar='-P', action=argparse.BooleanOptionalAction,
                     help='multicore processing')
 parser.add_argument('--threshold', '-t', metavar='-T', type=float, default=0.5,
-                    help='threshold for mean and var range, scalar for stddev, default=0.5')
+                    help='threshold between 0 and 1 for variance_range and mean_range, else 0 to 255, default=0.5')
 parser.add_argument('--multiplier', '-m', metavar='-M', type=float, default=5,
                     help='if using multicore processing, job multiplier per core. default = 5')
+parser.add_argument('--operator', '-o', metavar='-O', type=str, default="gt",
+                    help='use bash integer comparison style, i.e "gt","lt", default = "gt"')
 args = parser.parse_args()
+
+np.seterr(all='raise')
+
+
+def compare_with_threshold(variable):
+    if operator == "ge":
+        return variable >= threshold
+    if operator == "le":
+        return variable <= threshold
+    if operator == "gt":
+        return variable > threshold
+    if operator == "lt":
+        return variable < threshold
 
 
 def make_path(path, d_suffix):
@@ -29,7 +44,7 @@ def make_path(path, d_suffix):
     return out_path
 
 
-def get_variance_range(image_path):
+def is_variance_range(image_path):
     """
     sort of like an f test, if the range is between channels' variance is high it tells us that the image is likely a
     composite/multi image.
@@ -37,96 +52,73 @@ def get_variance_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
-        normalized_variance = variance / np.linalg.norm(variance)
-        variance_range = (max(normalized_variance) - min(normalized_variance))
-        result = is_range_greater_than_threshold(variance_range)
+        if np.any(variance):
+            normalized_variance = variance / np.linalg.norm(variance)
+            variance_range = (max(normalized_variance) - min(normalized_variance))
+        else:
+            variance_range = 0
+        result = compare_two_values(variance_range, threshold)
     return result
 
 
-def get_mean_range(image_path):
-    """
-    same type of function as get_variance_range, just a slightly different flavor.
-    """
+def is_mean_range(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean = ImageStat.Stat(histogram).mean
-        normalized_mean = mean / np.linalg.norm(mean)
-        mean_range = (max(normalized_mean) - min(normalized_mean))
-        result = is_range_greater_than_threshold(mean_range)
+        if np.any(mean):
+            normalized_variance = mean / np.linalg.norm(mean)
+            mean_range = (max(normalized_variance) - min(normalized_variance))
+        else:
+            mean_range = 0
+        result = compare_two_values(mean_range, threshold)
     return result
 
 
-def is_range_greater_than_threshold(range):
-    """
-    :param range: float
-    :return: True or Flase
-    """
-    if range >= threshold:
-        return True
+def compare_two_values(var1, var2):
+    if operator == "ge":
+        return var1 >= var2
+    if operator == "le":
+        return var1 <= var2
+    if operator == "gt":
+        return var1 > var2
+    if operator == "lt":
+        return var1 < var2
+    if operator == 'eq':
+        return var1 == var2
+    if operator == "ne":
+        return var1 != var2
 
 
-def is_var_greater_than_mean(var, mean):
-    """
-    checks if var or mean is greater, then sets the lower value as lesser and the higher value as greater.
-    we would then check if (lesser/greater > threshold), however (lesser > greater * threshold) is more efficient.
-    This function with stddev, median, mode can tell us if the mean isn't representative of the data.
-
-    :param var: variable
-    :param mean: the mean
-    :return: True or False
-    """
-    if var > mean:
-        greater = var
-        lesser = mean
-    else:
-        greater = var
-        lesser = mean
-    if lesser > threshold * greater:
-        return True
-
-
-def is_stddev_greater_than_mean(image_path):
+def stddev_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean, stddev = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).stddev)
-        result = is_var_greater_than_mean(stddev, mean)
+        result = compare_two_values(stddev, mean)
         return result
 
 
-def is_median_greater_than_mean(image_path):
+def median_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean, median = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).median)
-        result = is_var_greater_than_mean(median, mean)
+        result = compare_two_values(median, mean)
         return result
 
 
-def is_mode_greater_than_mean(image_path):
+def mode_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean, mode = np.asarray(ImageStat.Stat(histogram).mean), np.asarray(ImageStat.Stat(histogram).mode)
-        result = is_var_greater_than_mean(mode, mean)
+        result = compare_two_values(mode, mean)
         return result
 
 
-def is_threshold_greater_than_mean(image_path):
+def threshold_mean(image_path):
     with Image.open(image_path) as image:
         histogram = image.histogram()
         mean = np.asarray(ImageStat.Stat(histogram).mean)
-        if threshold > mean:
-            return True
-        else:
-            return False
-
-
-def is_mean_greater_than_threshold(image_path):
-    with Image.open(image_path) as image:
-        histogram = image.histogram()
-        mean = np.asarray(ImageStat.Stat(histogram).mean)
-        if threshold <= mean:
-            return True
-        else:
-            return False
+        result = compare_two_values(threshold, mean)
+        return result
 
 
 def do_f_test(image_path):
@@ -138,7 +130,7 @@ def do_f_test(image_path):
         variance = ImageStat.Stat(histogram).var
         normalized_variance = variance / np.linalg.norm(variance)
         f_value = (max(normalized_variance) / min(normalized_variance))
-        result = is_range_greater_than_threshold(f_value)
+        result = compare_two_values(f_value)
     return result
 
 
@@ -164,27 +156,26 @@ def get_unique_colors(image_path):
 
 def read_command(command):
     if "variance_range" == command.lower():
-        return get_variance_range, "_variance_range_"
+        return is_variance_range, "_variance_range_"
     if "mean_range" == command.lower():
-        return get_mean_range, "_mean_range_"
+        return is_mean_range, "_mean_range_"
     if "stddev_mean" == command.lower():
-        return is_stddev_greater_than_mean, "_sttdev_mean_"
+        return stddev_mean, "_stddev_mean_"
+    if "threshold_mean" == command.lower():
+        return threshold_mean, "_mean_"
     if "f_test" == command.lower():
         return do_f_test, "_f_test_"
     if "median_mean" == command.lower():
-        return is_median_greater_than_mean, "_median_mean_"
+        return median_mean, "_median_mean_"
     if "unique_colors" == command.lower():
         return get_unique_colors, "_unique_colors_"
-    if "x_mean" == command.lower():
-        return is_threshold_greater_than_mean, "_x_mean_"
-    if "mean_x" == command.lower():
-        return is_mean_greater_than_threshold, "_mean_x_"    
 
 
 p = Path(args.directory)
 parallel = args.parallel
 multiplier = args.multiplier
 threshold = args.threshold
+operator = args.operator
 command = read_command(args.command)
 
 

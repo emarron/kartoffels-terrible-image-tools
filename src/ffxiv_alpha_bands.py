@@ -18,7 +18,7 @@ def to_bands(img: Image.Image):
     values_lo = [0x11, 0x33, 0x55, 0x77, 0x99, 0xBB, 0xDD]
 
     mid = 0x11 // 2
-    # bad ranges masks
+    # bad range0s masks
     u_masks = [in_range(alpha, a + 1, (a + 0x11) - mid) for a in values_lo]
     d_masks = [in_range(alpha, a + mid, (a + 0x11) - 1) for a in values_lo]
     # good ranges masks
@@ -92,7 +92,7 @@ def do_thing_split(path):
 if __name__ == '__main__':
     XBR_path = Path('./xbr_4x_blend/')
     XBR_directories = list(filter(lambda path: path.is_dir(), XBR_path.glob('*')))
-    normals_path = Path('./chara_Flattened/')
+    normals_path = Path('./chara_normal_output/')
     normals_list = list(normals_path.glob('**/*.*'))
     parallel = True
     if parallel:

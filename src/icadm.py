@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description="ICADM, Image Channel and Directory
 parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial directory to be processed.',
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
-                    help='split, merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!), '
+                    help='split, merge, alpha_merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!), '
                          'solid_colors, rgb_gray_fix, gray_rgb, rgb_gray',
                     required=True)
 # parser.add_argument('--output', '-o', metavar='-O', type=str, default='png', help='output image type, png or tga, '
@@ -97,10 +97,16 @@ def do_thing_rgb_gray_fix(path):
 def do_thing_rgb_gray(path):
     with Image.open(path) as image:
         out_path = make_path(path, '_rgb2gray', False)
-        if numpy.array_equal(numpy.array(image.getchannel('R')), numpy.array(image.getchannel('G'))):
+        # allclose is expensive, but highly accurate
+        # if numpy.allclose(numpy.array(image.getchannel('R')) / 255, numpy.array(image.getchannel('G')) / 255, atol=0.30,
+        #                   rtol=10):
+        #     # atol should be less than .2, I mean really...., but never above .3
+        if numpy.isclose(
+                numpy.mean(numpy.array(image.getchannel('R'))), numpy.mean(numpy.array(image.getchannel('G'))),
+                atol=2):
             save(image.getchannel('R'), out_path)
         else:
-            raise ValueError
+            print(path.name)
 
 
 def scale_image_values(image, multiplier):
@@ -112,6 +118,28 @@ def do_thing_gray_rgb(path):
     with Image.open(path) as image:
         out_path = make_path(path, '_gray2rgb')
         save(Image.merge('RGB', (image.split()[0], image.split()[0], image.split()[0])), out_path)
+
+
+def do_thing_flatten_RGBA_only(path):
+    rgb_path = make_path(path, '_RGB')
+    rgb_path = check_path_exists(rgb_path)
+    alpha_path = make_path(path, '_A')
+    alpha_path = check_path_exists(alpha_path)
+    try:
+        image = Image.open(rgb_path)
+        merged_path = make_path(path, '_output', False)
+        try:
+            with Image.open(alpha_path).convert('L') as alpha:
+                image.putalpha(alpha)
+                save(image, merged_path, ".png")
+                image.close()
+        except FileNotFoundError:
+            image.close()
+            # merged_path.parent.mkdir(exist_ok=True, parents=True)
+            # shutil.copy(rgb_path, merged_path.with_suffix(".png"))
+            pass
+    except FileNotFoundError:
+        pass  
 
 def do_thing_flatten_rgba(path):
     """
@@ -127,6 +155,7 @@ def do_thing_flatten_rgba(path):
 
 def do_thing_unflatten_rgba(path):
     flattened_path = make_path(path, '_RGBA')
+    flattened_path = check_path_exists(flattened_path)
     try:
         with Image.open(flattened_path) as image:
             merged_path = make_path(path, '_output', False)
@@ -146,8 +175,10 @@ def do_thing_flatten(path):
 
 def do_thing_unflatten(path):
     flattened_path = make_path(path, '_flattened')
+    flattened_path = check_path_exists(flattened_path)
     try:
         out_path = make_path(path, '_unflattened', False)
+        out_path.parent.mkdir(exist_ok=True, parents=True)
         shutil.copy(flattened_path, out_path)
     except FileNotFoundError:
         pass
@@ -283,6 +314,8 @@ def read_command(command):
         return do_thing_merge_R_G_B_A
     if "unflatten" == command.lower():
         return do_thing_unflatten
+    if "unflatten_rgba" == command.lower():
+        return do_thing_unflatten_rgba
     if "solid_colors" == command.lower():
         return do_thing_get_solid_colors
     if "rgb_gray_fix" == command.lower():
@@ -291,6 +324,8 @@ def read_command(command):
         return do_thing_rgb_gray
     if "gray_rgb" == command.lower():
         return do_thing_gray_rgb
+    if "alpha_merge" == command.lower():
+        return do_thing_flatten_RGBA_only
 
 
 if __name__ == '__main__':
