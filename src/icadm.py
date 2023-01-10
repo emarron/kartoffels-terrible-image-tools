@@ -14,8 +14,7 @@ parser = argparse.ArgumentParser(description="ICADM, Image Channel and Directory
 parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial directory to be processed.',
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
-                    help='split, merge, alpha_merge, 4split, 4merge, flatten, unflatten, tga_png (tga_png is destructive!), '
-                         'solid_colors, rgb_gray_fix, gray_rgb, rgb_gray',
+                    help='split, merge, alpha_merge, tga_png (destructive), 4split, 4merge, unflatten, unflatten_rgba, flatten, solid_colors, rgb_gray_Fix, rgb_gray, gray_rgb, alpha_merge',
                     required=True)
 # parser.add_argument('--output', '-o', metavar='-O', type=str, default='png', help='output image type, png or tga, '
 #                                                                                   'default=png')
@@ -139,19 +138,7 @@ def do_thing_flatten_RGBA_only(path):
             # shutil.copy(rgb_path, merged_path.with_suffix(".png"))
             pass
     except FileNotFoundError:
-        pass  
-
-def do_thing_flatten_rgba(path):
-    """
-    flatten dir and save to PNG
-    """
-    try:
-        with Image.open(path) as image:
-            out_path = make_path(path, '_RGBA')
-            save(image.convert('RGBA'), out_path)
-    except NotImplementedError:
-        unimplemented_type.append(path.name)
-
+        pass
 
 def do_thing_unflatten_rgba(path):
     flattened_path = make_path(path, '_RGBA')
