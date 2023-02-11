@@ -16,8 +16,8 @@ parser.add_argument('--command', '-c', metavar='-C', type=str,
                     required=True)
 parser.add_argument('--parallel', '-p', metavar='-P', action=argparse.BooleanOptionalAction,
                     help='multicore processing')
-parser.add_argument('--threshold', '-t', metavar='-T', type=float, default=0.5,
-                    help='threshold between 0 and 1 for variance_range and mean_range, else 0 to 255, default=0.5')
+parser.add_argument('--threshold', '-t', metavar='-T', type=float, default=128,
+                    help='threshold between 0 to 255, default=128')
 parser.add_argument('--multiplier', '-m', metavar='-M', type=float, default=5,
                     help='if using multicore processing, job multiplier per core. default = 5')
 parser.add_argument('--operator', '-o', metavar='-O', type=str, default="gt",
@@ -53,8 +53,9 @@ def is_variance_range(image_path):
         histogram = image.histogram()
         variance = ImageStat.Stat(histogram).var
         if np.any(variance):
-            normalized_variance = variance / np.linalg.norm(variance)
-            variance_range = (max(normalized_variance) - min(normalized_variance))
+            #normalized_variance = variance / np.linalg.norm(variance)
+            #variance_range = (max(normalized_variance) - min(normalized_variance))
+            variance_range = max(variance) - min(variance)
         else:
             variance_range = 0
         result = compare_two_values(variance_range, threshold)
@@ -66,8 +67,9 @@ def is_mean_range(image_path):
         histogram = image.histogram()
         mean = ImageStat.Stat(histogram).mean
         if np.any(mean):
-            normalized_variance = mean / np.linalg.norm(mean)
-            mean_range = (max(normalized_variance) - min(normalized_variance))
+            #normalized_variance = mean / np.linalg.norm(mean)
+            #mean_range = (max(normalized_variance) - min(normalized_variance))
+            mean_range = max(mean)-min(mean)
         else:
             mean_range = 0
         result = compare_two_values(mean_range, threshold)

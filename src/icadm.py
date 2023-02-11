@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description="ICADM, Image Channel and Directory
 parser.add_argument('--directory', '-d', metavar='-D', type=str, help='Initial directory to be processed.',
                     required=True)
 parser.add_argument('--command', '-c', metavar='-C', type=str,
-                    help='split, merge, alpha_merge, tga_png (destructive), 4split, 4merge, unflatten, unflatten_rgba, flatten, solid_colors, rgb_gray_Fix, rgb_gray, gray_rgb, alpha_merge',
+                    help='split, merge, alpha_merge, tga_png (destructive), 4split, 4merge, unflatten, unflatten_rgba, flatten, solid_colors, rgb_gray_Fix, rgb_gray, gray_rgb',
                     required=True)
 # parser.add_argument('--output', '-o', metavar='-O', type=str, default='png', help='output image type, png or tga, '
 #                                                                                   'default=png')

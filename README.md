@@ -69,7 +69,7 @@ options:
   --parallel, --no-parallel, -p
                         multicore processing
   --threshold -T, -t -T
-                        threshold between 0 and 1 for variance_range and mean_range, else 0 to 255, default=0.5
+                        threshold between 0 to 255, default=128
   --multiplier -M, -m -M
                         if using multicore processing, job multiplier per core. default = 5
   --operator -O, -o -O  use bash integer comparison style, i.e "gt","lt", default = "gt"
@@ -81,10 +81,9 @@ some operations to hopefully find interesting images when they are not labeled p
 Multi channel only:
 
 - mean_range: Check if range of means of the channels is (operator)
-  threshold. range is normalized to 0-1.
+  threshold.
 - variance_range: Check if range
-  of variances of the channels is (operator) threshold. range is
-  normalized to 0-1.
+  of variances of the channels is (operator) threshold.
 
 Both single channel and multi channel:
 
